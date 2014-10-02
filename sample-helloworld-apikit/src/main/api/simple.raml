@@ -1,0 +1,28 @@
+#%RAML 0.8
+baseUri: http://mocksvc.mulesoft.com/mocks/e8745650-602f-415f-9841-b6cc35d1407c/mocks/7e9e484e-d5e6-4086-bec2-04b7bc7f1a36
+title: Simple
+version: 1
+#baseUri: http:///api/{version}
+/simpleapi:
+    /hello:
+      get:
+        description: Simple Get Request to say HelloWorld
+        queryParameters:
+          name:
+        responses:
+          200:
+            body:
+              application/json:
+                example: |
+                  { "message":"Hello Sameer" }
+    /bye:
+      get:
+        description: Simple Get Request to say Goodbye
+        queryParameters:
+          name:
+        responses:
+          200:
+            body:
+              application/json:
+                example: |
+                  { "message":"Bye Sameer" }
