@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:data-mapper="http://www.mulesoft.org/schema/mule/ee/data-mapper" xmlns:quartz="http://www.mulesoft.org/schema/mule/quartz" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:objectstore="http://www.mulesoft.org/schema/mule/objectstore" xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:jms="http://www.mulesoft.org/schema/mule/jms" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" version="EE-3.5.1"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/objectstore http://www.mulesoft.org/schema/mule/objectstore/current/mule-objectstore.xsd
+http://www.mulesoft.org/schema/mule/ee/data-mapper http://www.mulesoft.org/schema/mule/ee/data-mapper/current/mule-data-mapper.xsd
+http://www.mulesoft.org/schema/mule/quartz http://www.mulesoft.org/schema/mule/quartz/current/mule-quartz.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+    <jms:activemq-connector name="Active_MQ" brokerURL="tcp://localhost:61616" validateConnections="true"  doc:name="Active MQ" maxRedelivery="2"/> 
+    <mulexml:schema-validation-filter schemaLocations="Employees.xsd" returnResult="false" name="ValidateSchema" doc:name="Schema Validation"/>
+    <objectstore:config name="ObjectStore" doc:name="ObjectStore"/>
+    <flow name="example-activemqFlow1" doc:name="example-activemqFlow1" doc:description="This instance consumes a message on error (it completes the transaction)">
+        <jms:inbound-endpoint queue="example.queue" connector-ref="Active_MQ" doc:name="JMS">
+            <jms:client-ack-transaction action="ALWAYS_BEGIN"/>
+        </jms:inbound-endpoint>
+        <logger message="#['message xml is ' + message.payload]" level="INFO" doc:name="Logger"/>
+        <mulexml:xml-to-dom-transformer doc:name="XML to DOM"/>
+
+        <message-filter throwOnUnaccepted="true" doc:name="Message">
+    	   <filter ref="ValidateSchema"/>
+   		</message-filter>
+
+        <logger message="#[&quot;dom is &quot; + xpath('/employees/employee[1]/name/text()').text]" level="INFO" doc:name="Logger"/>
+        <objectstore:store config-ref="ObjectStore" key="#[xpath('/employees/employee[1]/name/text()').text]" value-ref="#[message.payload]" overwrite="true" doc:name="ObjectStore"/>
+        <flow-ref name="retrieve-fromCache" doc:name="Flow Reference"/>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger message="#['oops']" level="INFO" doc:name="Logger"/>
+        </catch-exception-strategy>
+    </flow>
+    <flow name="retrieve-fromCache" doc:name="retrieve-fromCache" doc:description="A sub flow that retrieves data that was JUST inserted into the cache">
+        <objectstore:retrieve config-ref="ObjectStore" key="sam" doc:name="ObjectStore"/>
+        <mulexml:dom-to-xml-transformer doc:name="DOM to XML"/>
+        <logger message="#['payload from cache is ' + message.payload]" level="INFO" doc:name="Logger"/>
+    </flow>
+    <flow name="example-activemqFlow2" doc:name="example-activemqFlow2" doc:description="This instance retries a message x times before dequeing the message i.e. maxdelivery hits 2.">
+        <jms:inbound-endpoint doc:name="JMS" connector-ref="Active_MQ" queue="example.queue.2">
+            <jms:client-ack-transaction action="ALWAYS_BEGIN"/>
+        </jms:inbound-endpoint>
+        <logger message="#['message xml is ' + message.payload]" level="INFO" doc:name="Logger"/>
+        <mulexml:xml-to-dom-transformer doc:name="XML to DOM"/>
+        <message-filter throwOnUnaccepted="true" doc:name="Message">
+    	   <filter ref="ValidateSchema"/>
+   		</message-filter>
+        <logger message="#['dom message is ' + message.payload]" level="INFO" doc:name="Logger"/>
+    </flow>
+</mule>
